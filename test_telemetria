@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenF1 API</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+ 
+  <form>
+    <label for="driver_number">Driver 1 number:</label>
+    <input type="text" id="driver1_number"><br>
+
+    <label for="driver_number">Driver 2 number:</label>
+    <input type="text" id="driver2_number"><br>
+
+    <label for="session_input">Session:</label>
+    <input type="text" id="session_input"><br>
+
+    <label for="lap_input">Lap:</label>
+    <input type="text" id="lap_input"><br>
+    <button id='button' type='button'>VAI</button>
+
+  </form>
+
+  <canvas id="myTelemetry"></canvas>
+
+  <script>
+  //parte statica
+  let bottone = document.getElementById('button');
+  bottone.addEventListener('click', dynamic, false); 
+
+  //funzione per colore microsettori
+  function microsect_color(micros1,micros2,micros3)
+  {
+    let [sect_array] = [micros1,micros2,micros3]
+    let microsects_1 = [];
+
+    sect_array.forEach(element => {
+      
+    });
+
+    for(let i = 0; i < sect_array.length; i++)
+    {
+      for(let j = 0; j < sect_array[i].length; j++)
+      {
+
+      }
+    }
+  }
+
+
+
+  async function cardata_fetch(num_pilota, lap_number, num_session)  // funzione per le fetch 
+  {
+
+    document.body.innerHTML += "pilota:"+num_pilota+ "<br>";
+    document.body.innerHTML += "giro:"+lap_number+ "<br>";
+    document.body.innerHTML += "sessione:"+num_session+ "<br>";
+
+
+
+    const res1 = await fetch(`https://api.openf1.org/v1/Laps?driver_number=${num_pilota}&session_key=${num_session}&lap_number=${lap_number}`);
+    const lap1data = await res1.json();
+    if (!lap1data[0])
+    {
+      document.body.innerHTML += "Giro 1 non trovato.";
+      return;
+    }
+    let [microsects_1] = microsect_color(lap1data[0].segments_sector_1, lap1data[0].segments_sector_2, lap1data[0].segments_sector_3);
+
+    const res2 = await fetch(`https://api.openf1.org/v1/Laps?driver_number=${num_pilota}&session_key=${num_session}&lap_number=${lap_number+1}`);
+    const lap2data = await res2.json();
+    if (!lap2data[0])
+    {
+      document.body.innerHTML += "Giro 2 non trovato.";
+      return;
+    }
+
+    let inizio_lap1 = lap1data[0].date_start;
+    document.body.innerHTML += "inizio lap: " + inizio_lap1 + "<br>";
+
+    let inizio_lap2 = lap2data[0].date_start;
+    document.body.innerHTML += "fine lap: " + inizio_lap2 + "<br>";
+
+    const res3 = await fetch("https://api.openf1.org/v1/car_data?driver_number="+num_pilota+"&session_key="+num_session+"&date>="+inizio_lap1+"&date<="+inizio_lap2);
+    const cardata = await res3.json();
+    if (!cardata[0])
+    {
+      document.body.innerHTML += "cardata non trovato.";
+      return;
+    }
+
+    for (let i = 0; i < cardata.length; i++)
+    {
+      document.body.innerHTML += "orario: " + cardata[i].date + " speed: " + cardata[i].speed + "<br>";
+    }
+
+    const res4 = await fetch("https://api.openf1.org/v1/location?driver_number="+num_pilota+"&session_key="+num_session+"&date>="+inizio_lap1+"&date<="+inizio_lap2);
+    const location_data = await res4.json();
+    if (!location_data[0])
+    {
+      document.body.innerHTML += "location_data non trovato.";
+      return;
+    }
+    let xyvect = [];
+    for (let i = 0; i < location_data.length; i++)
+    {
+      xyvect.push(Math.sqrt(location_data[i].x * location_data[i].x + location_data[i].y * location_data[i].y))
+    }
+    console.log(xyvect);
+
+
+  let x_labels = [];
+  for(let i= 0; i < cardata.length; i++)
+  {
+    x_labels.push(cardata[i].date);
+  }
+
+  let speeds = [];
+  for(let i= 0; i < cardata.length; i++)
+  {
+    speeds.push(cardata[i].speed);
+  }
+
+  return [xyvect,speeds];
+}//chiudo funzione fetch
+    
+  
+async function dynamic() //al click del bottone
+{ 
+    
+
+//fp1 session key = 9980 gp imola = 9987 // https://api.openf1.org/v1/car_data?driver_number=81&session_key=10029&date%3E=2025-05-03T20:43:34.976000+00:00&date%3C=2025-05-03T20:45:01.303000+00:00
+let num_pilota1 = document.getElementById('driver1_number').value;
+let num_pilota2 = document.getElementById('driver2_number').value;
+let lap_number = parseInt(document.getElementById('lap_input').value);
+let num_session = parseInt(document.getElementById('session_input').value);
+
+let [x_labels,speeds] = await cardata_fetch(num_pilota1, lap_number, num_session);
+let [labels2, speeds2] = await cardata_fetch(num_pilota2, lap_number, num_session);
+document.body.innerHTML += "SIUM";
+
+//PARTE creazione grafico  
+let ctx = document.getElementById("myTelemetry");
+
+  let xy_data = {
+	labels: x_labels, //cardata.map(point => point.date),  valori asse x
+    datasets: [{ //quante funzoni/linee disegna
+        label: "pilota "+ num_pilota1,
+        borderColor: "rgba(255, 50, 50, 1)",  
+        data: speeds, //valori asse y
+        fill: false
+    },
+    {
+      label: "pilota "+ num_pilota2,
+        borderColor: "rgba(50, 50, 255, 1)",  
+        data: speeds2, //valori asse y
+        fill: false
+    }]
+  };
+
+  let telemetry_chart = new Chart(ctx, {
+    type: 'line',
+    data: xy_data,
+    options: {
+        scales: {
+            y:{
+                    beginAtZero:true  
+            }
+        }
+    }
+});
+
+}//chiudo function dynamic al click
+
+
+
+
+
+
+
+
+
+ /*  FETCH ANNIDATE DI BACKUP  
+    //"https://api.openf1.org/v1/car_data?driver_number="+num_pilota+"&session_key="+num_session+"&date>"+inizio_lap1+"&date<="+inizio_lap2";
+    fetch(`https://api.openf1.org/v1/Laps?driver_number=${num_pilota}&session_key=${num_session}&lap_number=${lap_number}`)//https://api.openf1.org/v1/Laps?driver_number=${num_pilota}&session_key=latest&lap_number=2
+    .then(response => response.json())
+    .then(lap1data => {
+
+      if (!lap1data[0]) {
+            document.body.innerHTML += "Giro 1 non trovato.";
+            return;
+          }
+      let inizio_lap1 = lap1data[0].date_start;
+      document.body.innerHTML += "lap1: " + inizio_lap1 + "<br>";
+
+      return fetch(`https://api.openf1.org/v1/Laps?driver_number=${num_pilota}&session_key=${num_session}&lap_number=${lap_number+1}`)
+      .then(response => response.json())
+      .then(lap2data => {
+
+        if (!lap2data[0]) {
+            document.body.innerHTML += "Giro 2 non trovato.";
+            return;
+          }
+
+        let inizio_lap2 = lap2data[0].date_start;
+        document.body.innerHTML += "lap2: " + inizio_lap2 + "<br>";
+
+        return fetch(`https://api.openf1.org/v1/car_data?driver_number=${num_pilota}&session_key=${num_session}&date>=${inizio_lap1}&date<=${inizio_lap2  }`)//${inizio_lap2}
+        .then(response => response.json())
+        .then(cardata => {  
+
+      //const orario_inizio_giro = lapdata[0].date_start ;
+      //document.body.innerHTML = JSON.stringify(lapdata, null, 2);
+          for (let i = 0; i < cardata.length; i++)
+          {
+            document.body.innerHTML += "orario: " + cardata[i].date + " speed: " + cardata[i].speed + "<br>";
+          }
+    */
+      
+
+
+  </script> 
+
+<div style="width: 10px; height: 30px; background-color: red; margin: 1px; display:inline-block;"></div>
+<div style="width: 10px; height: 30px; background-color: blue; margin: 1px; display:inline-block;"></div>
+<div style="width: 10px; height: 30px; background-color: green; margin: 1px; display:inline-block;"></div>
+
+
+</body>
+</html>
+
